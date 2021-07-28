@@ -46,7 +46,7 @@ const int BZR = 9; // buzzer or beeper
 
 
 volatile int STRT_state = 0; // for button interrupt reads
-const int BUZZ_LENGTH = 1200; // hz freq for the buzzer/beeper
+const int BUZZ_LENGTH = 1200; // duration for the buzzer/beeper
 long unsigned buzz_end = 0; // store when buzzer finishes in ms 
 bool buzz_trigger = 0;
 int STRT_DEBOUNCE_TIME = 50; // ms

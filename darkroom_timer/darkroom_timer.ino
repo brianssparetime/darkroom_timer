@@ -16,9 +16,6 @@
 #define DEBUG
 
 
-const int MAX_TIME = 60 * 60 -1; // 1 hour
-const int BUZZ_LENGTH = 1000; // time in ms for the buzzer/beeper
-
 // --------- pins -----------
 
 //arduino pin mapping 
@@ -71,6 +68,9 @@ long unsigned timer_end = 0; // store when timer finishes in ms
 long unsigned last_disp_update = 0; // used for refreshing 47seg 
 long unsigned buzz_end = 0; // store when buzzer finishes in ms 
 
+const int MAX_TIME = 60 * 60 -1; // 1 hour
+const int BUZZ_LENGTH = 300; // time in ms for the buzzer/beeper
+
 enum f_states {
   F_SELECT,
   F_TIMER_EDIT
@@ -81,8 +81,6 @@ f_states F_STATE = F_SELECT;
 bool prev_RE_button = false;
 bool prev_SLS = false;
 bool prev_ENS = false;
-
-
 
 
 
@@ -246,6 +244,8 @@ void start_isr() {
     pinMode(SLR, OUTPUT); // low active
     digitalWrite(ENR, HIGH); // technically not necessary since switches will override in loop, but for testing
     digitalWrite(SLR, LOW); 
+    pinMode(BZR, OUTPUT);
+
     
 
     // set up other hardware
@@ -300,7 +300,8 @@ void start_isr() {
 
     // since we can't delay or use millis in functions called by the ISR, let's use EN_STATE_CHANGE and do that all here
     if(EN_STATE_CHANGE == 1) {
-      Serial.println("state change from ISR detected; new state is: "+String(EN_STATE));  
+      Serial.println("state change from ISR detected; old state is: "+String(EN_STATE));  
+      Serial.println("new state is "+String(EN_ISR_REQ_STATE));
       EN_STATE_CHANGE = 0;
       if (EN_ISR_REQ_STATE == EN_ACTIVE) {
         EN_STATE = EN_ACTIVE;
@@ -314,6 +315,7 @@ void start_isr() {
         timer_end = 0;
       } else if (EN_ISR_REQ_STATE == EN_OVERRIDE_ON) {
         Serial.println("OVERRIDE on");
+        EN_STATE = EN_OVERRIDE_ON;
       }
     }
 
@@ -342,6 +344,7 @@ void start_isr() {
             // timer has finished and not in override
             EN_STATE = EN_IDLE;
             enlargerOff();
+            buzz();
             timer_end = 0;
             Serial.println("Timer end detected");
         } else if (EN_STATE == EN_OVERRIDE_ON) {
