@@ -95,17 +95,6 @@ void start_isr() {
 }
 
 
-
-void buzz_millis() {
-  // TODO: rewrite to be interrupt safe using millis()
-  digitalWrite(BZR,HIGH);
-  delay(1000);
-  digitalWrite(BZR,LOW);
-  //noTone(BZR);
-  Serial.println("buzz millis");
-}
-
-
 void buzz() {
   digitalWrite(BZR,HIGH);
   Serial.println("buzz on");
@@ -128,13 +117,8 @@ void buzzcheck() {
 
 
   void setup() {
-    // put your setup code here, to run once:
-
-
-    #ifdef DEBUG 
-      Serial.begin(9600);
-      Serial.println("Timer online");
-    #endif
+    Serial.begin(9600);
+    Serial.println("Timer online");
 
     // set up pins
     pinMode(BZR, OUTPUT);
@@ -146,8 +130,6 @@ void buzzcheck() {
     pinMode(SLR, OUTPUT); // low active
     digitalWrite(ENR, HIGH); // technically not necessary since switches will override in loop, but for testing
     digitalWrite(SLR, LOW); 
-
-    
 
     // set up other hardware
 
@@ -161,8 +143,6 @@ void buzzcheck() {
     tm.display(2, 2);
     tm.display(1, 1);
     tm.display(0, 0);
-    
-   
 
     // rotary encoder
     EncoderInterrupt.begin( &encoder );
@@ -175,9 +155,6 @@ void buzzcheck() {
     lcd.print("  TIMER");
 
   }
-
-
-
 
 
   /*     ----------    L O O P     --------- */

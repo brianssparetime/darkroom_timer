@@ -7,13 +7,8 @@
 
 
 /*
- * TODO: 
- *   - write buzzer not to use delay()
- *   - expand menu
- *     - easier state additions
- *     - support film dev schedule
- *   - check for pin swap on RE_BUT and if hardwired pull up resistor is a problem ???
- *   - debounce buttons SLS ENS STRT ???
+
+  For use on Arduino Nano
 
  */
 
@@ -22,12 +17,10 @@
 
 
 const int MAX_TIME = 60 * 60 -1; // 1 hour
-const int BUZZ_LENGTH = 2000; // time in ms for the buzzer/beeper
+const int BUZZ_LENGTH = 1000; // time in ms for the buzzer/beeper
 
 // --------- pins -----------
 
-const int CLK = A3; // 4seg
-const int DIO = A2; // 4seg
 //arduino pin mapping 
 //see https://www.electronicshub.org/wp-content/uploads/2021/01/Arduino-Nano-Pinout.jpg
 #define D4 PD4
@@ -36,14 +29,15 @@ const int DIO = A2; // 4seg
 #define D6 PD6
 #define D7 PD7
 #define D8 PB0
-#define D9 PB1
+//#define D9 PB1
 
 // enlarger and safelight switches and relays
 const int ENS = D4; // enlarger switch, active high, pulldown
 const int SLS = D5; // safelight switch, active high, pulldown
 const int ENR = A0; // enlarger relay, active low, pullup
 const int SLR = A1; // safelight relay, active low, pullup
-
+const int CLK = A3; // 4seg
+const int DIO = A2; // 4seg
 // must be pin 2 or 3 on nano for interrupts to work
 const int STRT = D3; // start button and footswitch
 
@@ -51,21 +45,27 @@ const int RE_BUT = D6; // rotary encoder button  // NOTE:  library does pinmode 
 const int RE_A = D7; // rotary encoder motion
 const int RE_B = D8; // rotary encoder motion
 
-const int BZR = D9; // buzzer or beeper
+const int BZR = 9; // buzzer or beeper
 
 
 
 // --------    state variables -----------
 
 int cur_tmr_val = 12; // seconds; does not count down
-int new_tmr_val = 12; // seconds, for when changing
+int new_tmr_val = 12; // seconds, for when setting a new value
 enum en_states {
-  EN_ACTIVE,
-  EN_OVERRIDE_ON,
-  EN_IDLE
+  EN_ACTIVE, //0
+  EN_OVERRIDE_ON, //1
+  EN_IDLE //2
 };
 en_states EN_STATE = EN_IDLE;
-bool EN_STATE_CHANGE = 0;
+volatile bool EN_STATE_CHANGE = 0;
+volatile en_states EN_ISR_REQ_STATE = EN_IDLE;
+
+volatile int STRT_state = 0; // for button interrupt reads
+const int STRT_DEBOUNCE_TIME = 50; // ms
+volatile long unsigned last_start_debounce = 0; // store when timer finishes in ms 
+//long unsigned start_pr_time = 0; // time elapsed since start pressed; reset at release
 
 long unsigned timer_end = 0; // store when timer finishes in ms 
 long unsigned last_disp_update = 0; // used for refreshing 47seg 
@@ -82,10 +82,7 @@ bool prev_RE_button = false;
 bool prev_SLS = false;
 bool prev_ENS = false;
 
-volatile int STRT_state = 0; // for button interrupt reads
-int STRT_DEBOUNCE_TIME = 100; // ms
-long unsigned last_start_debounce = 0; // store when timer finishes in ms 
-long unsigned start_pr_time = 0; // time elapsed since start pressed; reset at release
+
 
 
 
@@ -99,14 +96,14 @@ LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars
 
 // display a value given in seconds as mm:ss on the segment display
 void displayTimeSeg(int seconds) {
-  int minutes = seconds / 60;
-  seconds = seconds % 60;
+  int m = seconds / 60;
+  int s = seconds % 60;
 
   tm.point(1);
-  tm.display(3, seconds % 10);
-  tm.display(2, seconds / 10 % 10);
-  tm.display(1, minutes % 10);
-  tm.display(0, minutes / 10 % 10);
+  tm.display(3, s % 10);
+  tm.display(2, s / 10 % 10);
+  tm.display(1, m % 10);
+  tm.display(0, m / 10 % 10);
 }
 
 
@@ -116,21 +113,18 @@ void enlargerOff() {
     //delay(500); // TODO: consider the wisdom of this decision
     digitalWrite(SLR, LOW); // turn on safelight
     lcd.backlight();
-    EN_STATE = EN_IDLE;
-    timer_end = 0;
+    //EN_STATE = EN_IDLE;
     displayTimeSeg(cur_tmr_val);
-    buzz();
 }
 
 
 void enlargerOn() {
     Serial.println("Enlarger turned on!");
-    buzz();
     digitalWrite(SLR, HIGH); // turn off safelight
     lcd.noBacklight();
     //delay(500); // TODO: consider the wisdom of this decision
     digitalWrite(ENR, LOW); // turn on enlarger
-    EN_STATE = EN_ACTIVE;
+    //EN_STATE = EN_ACTIVE;
     displayTimeSeg(cur_tmr_val);   
 }
 
@@ -152,6 +146,23 @@ void updDispFTimer() {
     lcd.clear();
     lcd.setCursor(0,0); // col, row
     lcd.print("> TIMER");
+}
+
+
+void buzz() {
+  digitalWrite(BZR,HIGH);
+  Serial.println("buzz on");
+  buzz_end = millis() + BUZZ_LENGTH;
+}
+
+void buzzcheck() {
+  if (buzz_end == 0) {
+    return;
+  } else if (buzz_end <= millis()) {
+      buzz_end = 0;
+      digitalWrite(BZR,LOW);
+      Serial.println("buzz off");
+  }
 }
 
 
@@ -177,9 +188,9 @@ void start_isr() {
   // Serial.println("ISR: start is "+String(st));   // don't print from ISRs - bad mojo
 
 
-  //timer triggers on release of start when in idle
-  //if we detect another press while in active, stay in override until release
-  // if release comes b
+  // timer triggers on release of start when in idle
+  // if we detect another press while in active, stay in override until release
+  // and on release cancel timer and turn off enlarger 
 
   // TODO maybe Long press just turns on enlarger without invoking timer if held down for at least X time???
   // strt_pr_time = millis();
@@ -190,19 +201,20 @@ void start_isr() {
     if (EN_STATE == EN_ACTIVE) {  
       // if start is pressed while enlarger is active, that means
       //  we want to keep going past the timer
-      EN_STATE = EN_OVERRIDE_ON;   
+      EN_ISR_REQ_STATE = EN_OVERRIDE_ON;  
+      EN_STATE_CHANGE = 1; 
     }
     
   } else if (STRT_state == LOW) { // start has been released
     
     if (EN_STATE == EN_IDLE) {
       // if start is released and we're idle, then start the timer
-        EN_STATE = EN_ACTIVE;
+        EN_ISR_REQ_STATE = EN_ACTIVE;
         EN_STATE_CHANGE = 1;
     } else if (EN_STATE == EN_OVERRIDE_ON || EN_STATE == EN_ACTIVE ) {
       // if start is released while in override, this ends override
       // if start is released while in active, prematurely end timer
-      EN_STATE = EN_IDLE;
+      EN_ISR_REQ_STATE = EN_IDLE;
       EN_STATE_CHANGE = 1;
     }
      
@@ -210,21 +222,6 @@ void start_isr() {
 }
 
 
-void buzz() {
-  digitalWrite(BZR,HIGH);
-  Serial.println("buzz on");
-  buzz_end = millis() + BUZZ_LENGTH;
-}
-
-void buzzcheck() {
-  if (buzz_end == 0) {
-    return;
-  } else if (buzz_end <= millis()) {
-      buzz_end = 0;
-      digitalWrite(BZR,LOW);
-      Serial.println("buzz off");
-  }
-}
 
 
 
@@ -233,11 +230,7 @@ void buzzcheck() {
 
 
   void setup() {
-    // buzz
-//    pinMode(BZR, OUTPUT);
-//    digitalWrite(BZR,HIGH);
-//    delay(5000);
-//    digitalWrite(BZR,LOW);
+
     
     #ifdef DEBUG 
       Serial.begin(9600);
@@ -296,24 +289,31 @@ void buzzcheck() {
     // only call this once per loop cicle, or at any time you want to know any incremental change
     int delta = encoder.delta();
 
-    #ifdef DEBUG 
+//    #ifdef DEBUG 
 //      Serial.print("EN_STATE: ");
 //      Serial.println(EN_STATE);
 //      Serial.print("F_STATE: ");
 //      Serial.println(F_STATE);
-    #endif
+//    #endif
     buzzcheck(); //turn off buzzer if needed
 
 
     // since we can't delay or use millis in functions called by the ISR, let's use EN_STATE_CHANGE and do that all here
     if(EN_STATE_CHANGE == 1) {
-      Serial.println("state change from ISR detected");  
+      Serial.println("state change from ISR detected; new state is: "+String(EN_STATE));  
       EN_STATE_CHANGE = 0;
-      if (EN_STATE == EN_ACTIVE) {
+      if (EN_ISR_REQ_STATE == EN_ACTIVE) {
+        EN_STATE = EN_ACTIVE;
+        buzz();
         enlargerOn();
         timer_end = millis() + 1000 * cur_tmr_val; // start the timer
-      } else if (EN_STATE == EN_IDLE) {
+      } else if (EN_ISR_REQ_STATE == EN_IDLE) {
+        EN_STATE = EN_IDLE;
+        buzz();
         enlargerOff();
+        timer_end = 0;
+      } else if (EN_ISR_REQ_STATE == EN_OVERRIDE_ON) {
+        Serial.println("OVERRIDE on");
       }
     }
 
@@ -329,20 +329,24 @@ void buzzcheck() {
         } else {
           timeleft = 0;
           overtime = (now - timer_end) / 1000;
+          Serial.println("past end of timer");
         }
         
-        if (timeleft >= 0) {  // if timer still running
+        if (timeleft >= 0 && overtime == 0) {  // if timer still running
           //if (now > 1000 + last_disp_update) {
             displayTimeSeg(timeleft);
             //last_disp_update = now;
           //}
         } 
-        if (timeleft = 0 && overtime <= 1 && EN_STATE != EN_OVERRIDE_ON) {
+        if (timeleft == 0 && overtime >= 0  && EN_STATE != EN_OVERRIDE_ON) {
             // timer has finished and not in override
             EN_STATE = EN_IDLE;
             enlargerOff();
+            timer_end = 0;
+            Serial.println("Timer end detected");
         } else if (EN_STATE == EN_OVERRIDE_ON) {
              displayTimeSeg(overtime);
+             Serial.println("override state detected");
         }
    
     return;  // IGNORE REST OF LOOP
