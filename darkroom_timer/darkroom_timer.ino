@@ -48,8 +48,8 @@ const int BZR = 9; // buzzer or beeper
 
 // --------    state variables -----------
 
-int cur_tmr_val = 12; // seconds; does not count down
-int new_tmr_val = 12; // seconds, for when setting a new value
+int cur_tmr_val = 5; // seconds; does not count down
+int new_tmr_val = 5; // seconds, for when setting a new value
 enum en_states {
   EN_ACTIVE, //0
   EN_OVERRIDE_ON, //1
@@ -102,6 +102,17 @@ void displayTimeSeg(int seconds) {
   tm.display(2, s / 10 % 10);
   tm.display(1, m % 10);
   tm.display(0, m / 10 % 10);
+}
+
+void displayNegTimeSeg(int seconds) {
+  int m = seconds / 60;
+  int s = seconds % 60;
+
+  tm.point(1);
+  tm.display(3, s % 10);
+  tm.display(2, s / 10 % 10);
+  tm.display(1, m % 10);
+  tm.display(0, '-');
 }
 
 
@@ -340,7 +351,7 @@ void start_isr() {
             //last_disp_update = now;
           //}
         } 
-        if (timeleft == 0 && overtime >= 0  && EN_STATE != EN_OVERRIDE_ON) {
+        if (timeleft == 0 && overtime > 0  && EN_STATE != EN_OVERRIDE_ON) {
             // timer has finished and not in override
             EN_STATE = EN_IDLE;
             enlargerOff();
@@ -348,7 +359,11 @@ void start_isr() {
             timer_end = 0;
             Serial.println("Timer end detected");
         } else if (EN_STATE == EN_OVERRIDE_ON) {
-             displayTimeSeg(overtime);
+             if (overtime > 0) {
+               displayNegTimeSeg(overtime);
+             } else {
+               displayTimeSeg(timeleft);
+             }
              Serial.println("override state detected");
         }
    
