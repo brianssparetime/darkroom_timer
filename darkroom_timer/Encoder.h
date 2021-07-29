@@ -1,3 +1,5 @@
+//https://github.com/John-Lluch/Encoder
+
 #ifndef Encoder_H
 #define Encoder_H
 

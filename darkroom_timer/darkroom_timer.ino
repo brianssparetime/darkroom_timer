@@ -447,6 +447,9 @@ void start_isr() {
         https://forum.arduino.cc/index.php?topic=147825.0
         pull up pull down
         https://www.instructables.com/Understanding-the-Pull-up-Resistor-With-Arduino/
+        debouncing
+        https://forum.arduino.cc/t/debouncing-an-interrupt-trigger/45110/3
+        https://github.com/thomasfredericks/Bounce2   <<<<< TODO:  seriously consider trying this!!!
 
       TM1637 4 segment display
       https://create.arduino.cc/projecthub/ryanchan/tm1637-digit-display-arduino-quick-tutorial-ca8a93
@@ -457,6 +460,8 @@ void start_isr() {
 
       enum switch
       https://stackoverflow.com/questions/52932529/why-does-my-switch-case-default-when-using-enums
+
+
 
 
      */

@@ -1,3 +1,5 @@
+//https://github.com/John-Lluch/Encoder
+
 #include <Arduino.h>
 #include "Encoder.h"
 
