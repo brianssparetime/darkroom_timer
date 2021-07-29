@@ -14,9 +14,9 @@
 
 
 
-const int RE_BUT = 5; // rotary encoder button  // NOTE:  library does pinmode pullup
+const int RE_BUT = 6; // rotary encoder button  // NOTE:  library does pinmode pullup
 const int RE_A = 7; // rotary encoder motion
-const int RE_B = 9; // rotary encoder motion
+const int RE_B = 8; // rotary encoder motion
 
 
 int foo = 128;
