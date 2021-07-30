@@ -24,7 +24,6 @@ const int DIO = A2; // 4seg
 #define D6 PD6
 #define D7 PD7
 #define D8 PB0
-#define D9 PB1
 
 // enlarger and safelight switches and relays
 const int ENS = D4; // enlarger switch, active high, pulldown
@@ -33,22 +32,24 @@ const int ENR = A0; // enlarger relay, active low, pullup
 const int SLR = A1; // safelight relay, active low, pullup
 
 // must be pin 2 or 3 on nano for interrupts to work
-const int STRT = D3; // start button and footswitch
+const int STRT = 3; // start button and footswitch
 //const int BACK = 0; // back button
 
-const int RE_BUT = D6; // rotary encoder button  // NOTE:  library does pinmode pullup
-const int RE_A = D7; // rotary encoder motion
-const int RE_B = D8; // rotary encoder motion
+const int RE_BUT = 6; // rotary encoder button  // NOTE:  library does pinmode pullup
+const int RE_A = 7; // rotary encoder motion
+const int RE_B = 8; // rotary encoder motion
 
 
 const int BZR = 9; // buzzer or beeper
 
 
+int interval_len = 1000; //ms
+long unsigned next_interval = 0;
 
 volatile int STRT_state = 0; // for button interrupt reads
 const int BUZZ_LENGTH = 1200; // duration for the buzzer/beeper
 long unsigned buzz_end = 0; // store when buzzer finishes in ms 
-bool buzz_trigger = 0;
+volatile bool buzz_trigger = 0;
 int STRT_DEBOUNCE_TIME = 50; // ms
 long unsigned last_start_debounce = 0; // store when timer finishes in ms 
 
@@ -175,7 +176,10 @@ void buzzcheck() {
     // do this even if we ignore to prevent buildup
 
     // read the debounced value of the encoder button
-    bool pb = encoder.button();
+    bool pb = encoder.button();    
+    if (pb) {
+      Serial.println("RE button press");
+    }
     // get the encoder variation since our last check, it can be positive or negative, or zero if the encoder didn't move
     // only call this once per loop cicle, or at any time you want to know any incremental change
     int delta = encoder.delta();
@@ -198,10 +202,11 @@ void buzzcheck() {
     }
     //Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
 
-    
-    if (pb) {
-      Serial.println("RE button press");
+    if (next_interval < millis()) {
+      next_interval = millis() + interval_len;
+      Serial.println("================================="); 
     }
+
 
     // handle manual switch states
     // remember that the switches active high but the relays are active low

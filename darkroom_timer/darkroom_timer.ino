@@ -20,27 +20,27 @@
 
 //arduino pin mapping 
 //see https://www.electronicshub.org/wp-content/uploads/2021/01/Arduino-Nano-Pinout.jpg
-#define D4 PD4
-#define D5 PD5
-#define D3 PD3
-#define D6 PD6
-#define D7 PD7
-#define D8 PB0
+//#define D4 PD4
+//#define D5 PD5
+//#define D3 PD3
+//#define D6 PD6
+//#define D7 PD7
+//#define D8 PB0
 //#define D9 PB1
 
 // enlarger and safelight switches and relays
-const int ENS = D4; // enlarger switch, active high, pulldown
-const int SLS = D5; // safelight switch, active high, pulldown
+const int ENS = 4; // enlarger switch, active high, pulldown
+const int SLS = 5; // safelight switch, active high, pulldown
 const int ENR = A0; // enlarger relay, active low, pullup
 const int SLR = A1; // safelight relay, active low, pullup
 const int CLK = A3; // 4seg
 const int DIO = A2; // 4seg
 // must be pin 2 or 3 on nano for interrupts to work
-const int STRT = D3; // start button and footswitch
+const int STRT = 3; // start button and footswitch
 
-const int RE_BUT = D6; // rotary encoder button  // NOTE:  library does pinmode pullup
-const int RE_A = D7; // rotary encoder motion
-const int RE_B = D8; // rotary encoder motion
+const int RE_BUT = 6; // rotary encoder button  // NOTE:  library does pinmode pullup
+const int RE_A = 7; // rotary encoder motion
+const int RE_B = 8; // rotary encoder motion
 
 const int BZR = 9; // buzzer or beeper
 
@@ -421,8 +421,14 @@ void start_isr() {
         if (x > 0 && x < MAX_TIME) {
           new_tmr_val = x;
           updDispTimerEdit(new_tmr_val);
-          Serial.println("delta = " + String(delta) + " new_tmr_val = "+String(new_tmr_val));
-          Serial.println("rotation => time adjust");
+          String dir = "Neutral";
+          if(delta > 0) {
+            dir = "Right  ";
+            Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(new_tmr_val));
+          } else if (delta < 0) {
+            dir = "Left   ";
+            Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(new_tmr_val));
+          }
         }
       }
     } // end F_STATE switch
