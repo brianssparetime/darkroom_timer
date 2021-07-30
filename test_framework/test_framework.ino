@@ -53,6 +53,8 @@ int STRT_DEBOUNCE_TIME = 50; // ms
 long unsigned last_start_debounce = 0; // store when timer finishes in ms 
 
 
+int count = 128;
+
 TM1637 tm(CLK, DIO); // set up 47seg
 Encoder encoder(RE_A, RE_B, RE_BUT); // set up rotary encoder
 LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
@@ -117,7 +119,7 @@ void buzzcheck() {
 
 
   void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println("Timer online");
 
     // set up pins
@@ -178,9 +180,25 @@ void buzzcheck() {
     // only call this once per loop cicle, or at any time you want to know any incremental change
     int delta = encoder.delta();
    
-    if (delta != 0) {
-      Serial.println("delta = "+String(delta));
+    int new_foo = count - delta;
+    if (new_foo > 256) {
+      count = 256;
+    } else if (new_foo < 0) {
+      count = 0;
+    } else {
+      count = new_foo;
     }
+    String dir = "Neutral";
+    if(delta > 0) {
+      dir = "Right  ";
+      Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
+    } else if (delta < 0) {
+      dir = "Left   ";
+      Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
+    }
+    //Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
+
+    
     if (pb) {
       Serial.println("RE button press");
     }
@@ -219,6 +237,7 @@ void buzzcheck() {
         https://www.instructables.com/Understanding-the-Pull-up-Resistor-With-Arduino/
 
       TM1637 4 segment display
+      https://github.com/Seeed-Studio/Grove_4Digital_Display (library I used)
       https://create.arduino.cc/projecthub/ryanchan/tm1637-digit-display-arduino-quick-tutorial-ca8a93
       https://www.makerguides.com/tm1637-arduino-tutorial/
 

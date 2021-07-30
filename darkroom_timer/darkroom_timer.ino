@@ -138,10 +138,10 @@ void enlargerOn() {
 }
 
 
-void updDispTimerEdit() {
-    int s = cur_tmr_val % 60;
-    int m = (cur_tmr_val % 3600) / 60;
-    int h = cur_tmr_val / 3600;
+void updDispTimerEdit(int val) {
+    int s = val % 60;
+    int m = (val % 3600) / 60;
+    int h = val / 3600;
     char sb[50];
     sprintf(sb, "> set to: %02d:%02d", m,s);
     lcd.clear();
@@ -242,7 +242,7 @@ void start_isr() {
 
     
     #ifdef DEBUG 
-      Serial.begin(9600);
+      Serial.begin(115200);
       Serial.println("Timer online");
     #endif
 
@@ -341,7 +341,7 @@ void start_isr() {
           overtime = 0;
         } else {
           timeleft = 0;
-          overtime = (now - timer_end) / 1000;
+          overtime = (now - timer_end) / 1000 + 1; // +1 to avoid spending two seconds at zero
           Serial.println("past end of timer");
         }
         
@@ -388,10 +388,10 @@ void start_isr() {
 
       case F_SELECT: {
         // button press => enter time set
-        if (pb) { //&& (pb != prev_RE_button) ) {
+        if (pb && (pb != prev_RE_button) ) {
           // enter function settings
           F_STATE = F_TIMER_EDIT;
-          updDispTimerEdit();
+          updDispTimerEdit(cur_tmr_val);
           Serial.println("button press => enter set time");
         }
 
@@ -401,21 +401,27 @@ void start_isr() {
 
       case F_TIMER_EDIT: {
         // button press => go back to select function state
-        if (pb) {  //&& (pb != prev_RE_button) ) {
+        if (pb && (pb != prev_RE_button) ) {
           // return to F_SELECT
-          updDispFTimer();         
           cur_tmr_val = new_tmr_val;
+          updDispFTimer();  
           F_STATE = F_SELECT;
           Serial.println("button press: back to f-select");
         }
         
         // rotate => set new timer value
-        int x = new_tmr_val + delta;
-        // check bounds
+        int x = new_tmr_val;
+        if (delta >= 1) {
+          x += 1;
+        } else if (delta <= -1) {
+          x -= 1;
+        } else {
+          return; // should not happen
+        }
         if (x > 0 && x < MAX_TIME) {
           new_tmr_val = x;
-          updDispTimerEdit();
-          Serial.println("delta = " + String(delta));
+          updDispTimerEdit(new_tmr_val);
+          Serial.println("delta = " + String(delta) + " new_tmr_val = "+String(new_tmr_val));
           Serial.println("rotation => time adjust");
         }
       }
@@ -440,6 +446,9 @@ void start_isr() {
       RE:
       https://github.com/John-Lluch/Encoder
         https://www.instructables.com/Improved-Arduino-Rotary-Encoder-Reading/
+        https://github.com/John-Lluch/Encoder/issues/4#issue-955354998
+        https://github.com/PaulStoffregen/Encoder (didn't use)
+        
 
       Button interrupts:
       https://www.allaboutcircuits.com/technical-articles/using-interrupts-on-arduino/
@@ -452,6 +461,7 @@ void start_isr() {
         https://github.com/thomasfredericks/Bounce2   <<<<< TODO:  seriously consider trying this!!!
 
       TM1637 4 segment display
+      https://github.com/Seeed-Studio/Grove_4Digital_Display
       https://create.arduino.cc/projecthub/ryanchan/tm1637-digit-display-arduino-quick-tutorial-ca8a93
       https://www.makerguides.com/tm1637-arduino-tutorial/
 
@@ -461,7 +471,24 @@ void start_isr() {
       enum switch
       https://stackoverflow.com/questions/52932529/why-does-my-switch-case-default-when-using-enums
 
+      
+      
+      USB Mini male plug pinout
+      
+      |_|     |_|
+      |_|_____|_|
+          | |   (top row when narrow side of connector is up)
+        |  |  | (bottom row when narrow side of connector is up)
+      GND     5v 
 
+
+RE wiring
+                    ____
+      RE_A (7)   - |    |_  RE_BUT (6)
+      GND        - |    |_  GND
+      RE_B (8)   - |____|
+
+     Use 10k pullups on RE_A and RE_B to 5v (if not using KY040 module)
 
 
      */

@@ -6,7 +6,7 @@
  *  GND        - |    |_  GND
  *  RE_B (8)   - |____|
  * 
- * 
+ * use pullups on A and B to 5v if not using KY040 module
  * 
  */
 
@@ -19,27 +19,42 @@ const int RE_A = 7; // rotary encoder motion
 const int RE_B = 8; // rotary encoder motion
 
 
-int foo = 128;
-int prev_foo = 128;
-
-
+int count = 0;
 Encoder encoder(RE_A, RE_B, RE_BUT); // set up rotary encoder
+
+int interval_len = 1000; //ms
+long unsigned next_interval = 0;
+
+// ISR-related
+const int TRIG = 3;
+volatile bool trigger = 0;
+volatile int trigger_state = 0;
+
+
+void start_isr() {
+  trigger_state = digitalRead(TRIG);
+  if (trigger_state == HIGH) {
+    trigger = 1;
+  }
+}
 
   /*     ----------    S E T U P     --------- */
 
 
   void setup() {
 
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println("re test online");
 
     // rotary encoder
     EncoderInterrupt.begin( &encoder );
 
+    pinMode(TRIG, INPUT); // high active
+    attachInterrupt(digitalPinToInterrupt(TRIG), start_isr, CHANGE);
+
   }
 
   /*     ----------    L O O P     --------- */
-
 
 
   void loop() {
@@ -52,34 +67,31 @@ Encoder encoder(RE_A, RE_B, RE_BUT); // set up rotary encoder
     if (pb) {
       Serial.println("RE button press");
     }
-    
+
+    if(trigger) {
+      trigger = 0;
+      Serial.println("trigger");
+    }
     
     
     // get the encoder variation since our last check, it can be positive or negative, or zero if the encoder didn't move
     // only call this once per loop cicle, or at any time you want to know any incremental change
     int delta = encoder.delta();
-    //Serial.println("foo = "+String(foo));
 
-    if (abs(delta) <= 1 || abs(delta) >= 255) {
-      Serial.println("small delta "+String(delta));
-      return;
-    } else {
-      Serial.print("====== ");
+    String dir = "Neutral";
+    if(delta > 0) {
+      dir = "Right  ";
+      Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
+    } else if (delta < 0) {
+      dir = "Left   ";
+      Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
     }
+    //Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(count));
 
-    
-    Serial.println("delta = "+String(delta));
-    int new_foo = foo - delta;
-    if (new_foo > 256) {
-      foo = 256;
-    } else if (new_foo < 0) {
-      foo = 0;
-    } else {
-      foo = new_foo;
+
+    if (next_interval < millis()) {
+      next_interval = millis() + interval_len;
+      Serial.println("================================="); 
     }
-    Serial.println("delta = "+String(delta) +"   foo = "+String(foo));
-
-
-
 
   }
