@@ -73,6 +73,9 @@ bool prev_ENS = false;
 int rot_buffer = 0;
 long unsigned last_rot = 0;
 int rot_delay = 100; // ms
+long unsigned first_push = 0;
+int push_cooldown = 300; // ms
+
 
 enum f_states {
   F_SELECT,
@@ -397,48 +400,51 @@ void start_isr() {
     digitalWrite(SLR, !digitalRead(SLS));
 
 
-    // if nothing's happened on the RE, skip rest
-//    if (!pb && delta == 0) {
-//      return;
-//    }
 
-    switch(F_STATE) {
+    // pay attention to re button if the last time it was pressed was before cooldown ms ago
+    // otherwise, we're in cooldown or pb isn't being pressed, so ignore
+    if (pb && (first_push + push_cooldown < now)) {
+      first_push = now;
+      f_states NEW_F_STATE = F_STATE;
+      switch(F_STATE) {
+      
+          case F_SELECT: {
+            // button press => enter time set
+            
+            // enter function settings
+            NEW_F_STATE = F_TIMER_EDIT;
+            updDispTimerEdit(cur_tmr_val);
+            #ifdef DEBUG
+              Serial.println("button press => enter set time");
+            #endif
+            break;
+     
 
-      case F_SELECT: {
-        // button press => enter time set
-        if (pb && (pb != prev_RE_button) ) {
-          // enter function settings
-          F_STATE = F_TIMER_EDIT;
-          cur_tmr_val = new_tmr_val;
-          updDispFTimer();  
-          updDispTimerEdit(cur_tmr_val);
-          displayTimeSeg(cur_tmr_val);
+            // rotate => select different function
+            // TODO
+          }
 
-          #ifdef DEBUG
-            Serial.println("button press => enter set time");
-          #endif
+          case F_TIMER_EDIT: {
+            // button press => go back to select function state
+
+            // return to F_SELECT
+            cur_tmr_val = new_tmr_val;
+            displayTimeSeg(cur_tmr_val);
+            updDispFTimer();  
+            NEW_F_STATE = F_SELECT;
+            #ifdef DEBUG
+              Serial.println("button press: update 4s7d and back to f-select");
+            #endif
+            break;
         }
-
-        // rotate => select different function
-        // TODO
-      }
-
-      case F_TIMER_EDIT: {
-        // button press => go back to select function state
-        if (pb && (pb != prev_RE_button) ) {
-          // return to F_SELECT
-          cur_tmr_val = new_tmr_val;
-          displayTimeSeg(cur_tmr_val);
-          updDispFTimer();  
-          F_STATE = F_SELECT;
-          #ifdef DEBUG
-            Serial.println("button press: back to f-select");
-          #endif
-        }
-      }
   
-    } // end F_STATE switch
-    prev_RE_button = pb;
+      } // end F_STATE switch
+
+      F_STATE = NEW_F_STATE;  
+    }
+
+  
+  //  prev_RE_button = pb;
 
     // rotate => set new timer value
     if(delta != 0) {
@@ -452,7 +458,7 @@ void start_isr() {
  
      
     // if its been more than rot_delay since last rotary action
-    if (now > lr + rot_delay) {
+    if (F_STATE == F_TIMER_EDIT && (now > lr + rot_delay)) {
       int rb = rot_buffer;
       rot_buffer = 0;
       // some time has passed since the rotary did anything
@@ -476,6 +482,8 @@ void start_isr() {
           //Serial.println("rb is neutral after delay");
         #endif
       }
+    } else if (F_SELECT && (now > lr + rot_delay)) {
+      rot_buffer = 0;
     }
     
 
