@@ -18,16 +18,16 @@ const int CLK = A3; // 4seg
 const int DIO = A2; // 4seg
 //arduino pin mapping 
 //see https://www.electronicshub.org/wp-content/uploads/2021/01/Arduino-Nano-Pinout.jpg
-#define D4 PD4
-#define D5 PD5
-#define D3 PD3
-#define D6 PD6
-#define D7 PD7
-#define D8 PB0
+//#define D4 PD4
+//#define D5 PD5
+//#define D3 PD3
+//#define D6 PD6
+//#define D7 PD7
+//#define D8 PB0
 
 // enlarger and safelight switches and relays
-const int ENS = D4; // enlarger switch, active high, pulldown
-const int SLS = D5; // safelight switch, active high, pulldown
+const int ENS = 4; // enlarger switch, active high, pulldown
+const int SLS = 5; // safelight switch, active high, pulldown
 const int ENR = A0; // enlarger relay, active low, pullup
 const int SLR = A1; // safelight relay, active low, pullup
 

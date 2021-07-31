@@ -18,15 +18,8 @@
 
 // --------- pins -----------
 
-//arduino pin mapping 
-//see https://www.electronicshub.org/wp-content/uploads/2021/01/Arduino-Nano-Pinout.jpg
-//#define D4 PD4
-//#define D5 PD5
-//#define D3 PD3
-//#define D6 PD6
-//#define D7 PD7
-//#define D8 PB0
-//#define D9 PB1
+//arduino pin mapping based on Arduino Nano v3
+
 
 // enlarger and safelight switches and relays
 const int ENS = 4; // enlarger switch, active high, pulldown
@@ -48,8 +41,7 @@ const int BZR = 9; // buzzer or beeper
 
 // --------    state variables -----------
 
-int cur_tmr_val = 5; // seconds; does not count down
-int new_tmr_val = 5; // seconds, for when setting a new value
+
 enum en_states {
   EN_ACTIVE, //0
   EN_OVERRIDE_ON, //1
@@ -64,12 +56,23 @@ const int STRT_DEBOUNCE_TIME = 50; // ms
 volatile long unsigned last_start_debounce = 0; // store when timer finishes in ms 
 //long unsigned start_pr_time = 0; // time elapsed since start pressed; reset at release
 
-long unsigned timer_end = 0; // store when timer finishes in ms 
-long unsigned last_disp_update = 0; // used for refreshing 47seg 
-long unsigned buzz_end = 0; // store when buzzer finishes in ms 
-
+int cur_tmr_val = 5; // seconds; does not count down
+int new_tmr_val = 5; // seconds, for when setting a new value
 const int MAX_TIME = 60 * 60 -1; // 1 hour
+long unsigned timer_end = 0; // store when timer finishes in ms 
+
+//long unsigned last_disp_update = 0; // used for refreshing 47seg 
+
+long unsigned buzz_end = 0; // store when buzzer finishes in ms 
 const int BUZZ_LENGTH = 300; // time in ms for the buzzer/beeper
+
+bool prev_RE_button = false;
+bool prev_SLS = false;
+bool prev_ENS = false;
+
+int rot_buffer = 0;
+long unsigned last_rot = 0;
+int rot_delay = 100; // ms
 
 enum f_states {
   F_SELECT,
@@ -78,9 +81,9 @@ enum f_states {
 f_states F_STATE = F_SELECT;
 
 
-bool prev_RE_button = false;
-bool prev_SLS = false;
-bool prev_ENS = false;
+int interval_len = 1000; //ms
+long unsigned next_interval = 0;
+
 
 
 
@@ -293,6 +296,18 @@ void start_isr() {
 
   void loop() {
 
+    long unsigned now = millis(); // ms
+
+    #ifdef DEBUG
+      if (next_interval < millis()) {
+        next_interval = millis() + interval_len;
+        Serial.println("================================="); 
+      }
+    #endif DEBUG
+
+    buzzcheck(); //turn off buzzer if needed
+
+
     // do this even if we ignore to prevent buildup
     // read the debounced value of the encoder button
     bool pb = encoder.button();
@@ -300,32 +315,29 @@ void start_isr() {
     // only call this once per loop cicle, or at any time you want to know any incremental change
     int delta = encoder.delta();
 
-//    #ifdef DEBUG 
-//      Serial.print("EN_STATE: ");
-//      Serial.println(EN_STATE);
-//      Serial.print("F_STATE: ");
-//      Serial.println(F_STATE);
-//    #endif
-    buzzcheck(); //turn off buzzer if needed
 
 
     // since we can't delay or use millis in functions called by the ISR, let's use EN_STATE_CHANGE and do that all here
     if(EN_STATE_CHANGE == 1) {
-      Serial.println("state change from ISR detected; old state is: "+String(EN_STATE));  
-      Serial.println("new state is "+String(EN_ISR_REQ_STATE));
+      #ifdef DEBUG
+        Serial.println("state change from ISR detected; old state is: "+String(EN_STATE));  
+        Serial.println("new state is "+String(EN_ISR_REQ_STATE));
+      #endif
       EN_STATE_CHANGE = 0;
       if (EN_ISR_REQ_STATE == EN_ACTIVE) {
         EN_STATE = EN_ACTIVE;
         buzz();
         enlargerOn();
-        timer_end = millis() + 1000 * cur_tmr_val; // start the timer
+        timer_end = now + 1000 * cur_tmr_val; // start the timer
       } else if (EN_ISR_REQ_STATE == EN_IDLE) {
         EN_STATE = EN_IDLE;
         buzz();
         enlargerOff();
         timer_end = 0;
       } else if (EN_ISR_REQ_STATE == EN_OVERRIDE_ON) {
-        Serial.println("OVERRIDE on");
+        #ifdef DEBUG
+          Serial.println("OVERRIDE on");
+        #endif
         EN_STATE = EN_OVERRIDE_ON;
       }
     }
@@ -333,7 +345,6 @@ void start_isr() {
 
     // if we're in the middle of making an exposure...
     if (EN_STATE == EN_ACTIVE || EN_STATE == EN_OVERRIDE_ON) {
-        long unsigned now = millis(); // ms
         long unsigned timeleft = 0; // seconds
         long unsigned overtime = 0; // seconds
         if (timer_end >= now) { // timer still running
@@ -342,7 +353,9 @@ void start_isr() {
         } else {
           timeleft = 0;
           overtime = (now - timer_end) / 1000 + 1; // +1 to avoid spending two seconds at zero
-          Serial.println("past end of timer");
+          #ifdef DEBUG
+            Serial.println("past end of timer");
+          #endif
         }
         
         if (timeleft >= 0 && overtime == 0) {  // if timer still running
@@ -357,14 +370,18 @@ void start_isr() {
             enlargerOff();
             buzz();
             timer_end = 0;
-            Serial.println("Timer end detected");
+            #ifdef DEBUG
+              Serial.println("Timer end detected");
+            #endif
         } else if (EN_STATE == EN_OVERRIDE_ON) {
              if (overtime > 0) {
                displayNegTimeSeg(overtime);
              } else {
                displayTimeSeg(timeleft);
              }
-             Serial.println("override state detected");
+             #ifdef DEBUG
+               Serial.println("override state detected");
+             #endif
         }
    
     return;  // IGNORE REST OF LOOP
@@ -392,7 +409,9 @@ void start_isr() {
           // enter function settings
           F_STATE = F_TIMER_EDIT;
           updDispTimerEdit(cur_tmr_val);
-          Serial.println("button press => enter set time");
+          #ifdef DEBUG
+            Serial.println("button press => enter set time");
+          #endif
         }
 
         // rotate => select different function
@@ -406,30 +425,49 @@ void start_isr() {
           cur_tmr_val = new_tmr_val;
           updDispFTimer();  
           F_STATE = F_SELECT;
-          Serial.println("button press: back to f-select");
+          #ifdef DEBUG
+            Serial.println("button press: back to f-select");
+          #endif
         }
         
         // rotate => set new timer value
-        int x = new_tmr_val;
-        if (delta >= 1) {
-          x += 1;
-        } else if (delta <= -1) {
-          x -= 1;
-        } else {
-          return; // should not happen
+        long unsigned lr = last_rot;
+        if(delta != 0) {
+          rot_buffer -= delta;
+          last_rot = now;
+          #ifdef DEBUG
+            Serial.println("rb = "+String(rot_buffer) +"   delta = "+String(delta));
+          #endif
         }
-        if (x > 0 && x < MAX_TIME) {
-          new_tmr_val = x;
-          updDispTimerEdit(new_tmr_val);
+       
+         
+        // if its been more than rot_delay since last rotary action
+        if (now > lr + rot_delay) {
+          int rb = rot_buffer;
+          rot_buffer = 0;
+          // some time has passed since the rotary did anything
           String dir = "Neutral";
-          if(delta > 0) {
-            dir = "Right  ";
-            Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(new_tmr_val));
-          } else if (delta < 0) {
-            dir = "Left   ";
-            Serial.println(dir + ":  delta = "+String(delta) +"   foo = "+String(new_tmr_val));
+          if (rb > 0) {
+            new_tmr_val = min(new_tmr_val + 1, MAX_TIME);
+            #ifdef DEBUG
+              dir = "Right  ";
+              Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
+            #endif
+          } else if (rb < 0) {
+            new_tmr_val = max(new_tmr_val - 1, 1);
+            #ifdef DEBUG
+              dir = "Left   ";
+              Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
+            #endif
+          } else {
+            #ifdef DEBUG
+              Serial.println("rb is neutral after delay");
+            #endif
           }
         }
+        updDispTimerEdit(new_tmr_val);
+
+        
       }
     } // end F_STATE switch
     
