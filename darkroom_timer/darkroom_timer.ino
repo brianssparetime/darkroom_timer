@@ -284,6 +284,7 @@ void start_isr() {
     EN_STATE = EN_IDLE;
     F_STATE = F_SELECT;
 
+  buzz();
   }
 
 
@@ -397,9 +398,9 @@ void start_isr() {
 
 
     // if nothing's happened on the RE, skip rest
-    if (!pb && delta == 0) {
-      return;
-    }
+//    if (!pb && delta == 0) {
+//      return;
+//    }
 
     switch(F_STATE) {
 
@@ -408,7 +409,11 @@ void start_isr() {
         if (pb && (pb != prev_RE_button) ) {
           // enter function settings
           F_STATE = F_TIMER_EDIT;
+          cur_tmr_val = new_tmr_val;
+          updDispFTimer();  
           updDispTimerEdit(cur_tmr_val);
+          displayTimeSeg(cur_tmr_val);
+
           #ifdef DEBUG
             Serial.println("button press => enter set time");
           #endif
@@ -423,55 +428,56 @@ void start_isr() {
         if (pb && (pb != prev_RE_button) ) {
           // return to F_SELECT
           cur_tmr_val = new_tmr_val;
+          displayTimeSeg(cur_tmr_val);
           updDispFTimer();  
           F_STATE = F_SELECT;
           #ifdef DEBUG
             Serial.println("button press: back to f-select");
           #endif
         }
-        
-        // rotate => set new timer value
-        long unsigned lr = last_rot;
-        if(delta != 0) {
-          rot_buffer -= delta;
-          last_rot = now;
-          #ifdef DEBUG
-            Serial.println("rb = "+String(rot_buffer) +"   delta = "+String(delta));
-          #endif
-        }
-       
-         
-        // if its been more than rot_delay since last rotary action
-        if (now > lr + rot_delay) {
-          int rb = rot_buffer;
-          rot_buffer = 0;
-          // some time has passed since the rotary did anything
-          String dir = "Neutral";
-          if (rb > 0) {
-            new_tmr_val = min(new_tmr_val + 1, MAX_TIME);
-            #ifdef DEBUG
-              dir = "Right  ";
-              Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
-            #endif
-          } else if (rb < 0) {
-            new_tmr_val = max(new_tmr_val - 1, 1);
-            #ifdef DEBUG
-              dir = "Left   ";
-              Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
-            #endif
-          } else {
-            #ifdef DEBUG
-              Serial.println("rb is neutral after delay");
-            #endif
-          }
-        }
-        updDispTimerEdit(new_tmr_val);
-
-        
       }
+  
     } // end F_STATE switch
-    
     prev_RE_button = pb;
+
+    // rotate => set new timer value
+    if(delta != 0) {
+      rot_buffer -= delta;
+      last_rot = now;
+      #ifdef DEBUG
+        Serial.println("rb = "+String(rot_buffer) +"   delta = "+String(delta));
+      #endif
+    } 
+    long unsigned lr = last_rot;
+ 
+     
+    // if its been more than rot_delay since last rotary action
+    if (now > lr + rot_delay) {
+      int rb = rot_buffer;
+      rot_buffer = 0;
+      // some time has passed since the rotary did anything
+      String dir = "Neutral";
+      if (rb > 0) {
+        new_tmr_val = min(new_tmr_val + 1, MAX_TIME);
+        updDispTimerEdit(new_tmr_val);
+        #ifdef DEBUG
+          dir = "Right  ";
+          Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
+        #endif
+      } else if (rb < 0) {
+        new_tmr_val = max(new_tmr_val - 1, 1);
+        updDispTimerEdit(new_tmr_val);
+        #ifdef DEBUG
+          dir = "Left   ";
+          Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
+        #endif
+      } else {
+        #ifdef DEBUG
+          //Serial.println("rb is neutral after delay");
+        #endif
+      }
+    }
+    
 
   } // end loop
 
