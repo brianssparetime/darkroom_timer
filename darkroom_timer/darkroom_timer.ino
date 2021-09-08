@@ -52,7 +52,7 @@ volatile bool EN_STATE_CHANGE = 0;
 volatile en_states EN_ISR_REQ_STATE = EN_IDLE;
 
 volatile int STRT_state = 0; // for button interrupt reads
-const int STRT_DEBOUNCE_TIME = 50; // ms
+const int STRT_DEBOUNCE_TIME = 200; // ms
 volatile long unsigned last_start_debounce = 0; // store when timer finishes in ms 
 //long unsigned start_pr_time = 0; // time elapsed since start pressed; reset at release
 
@@ -270,7 +270,7 @@ void start_isr() {
     // 4-7 segment display
     tm.init();
     //set brightness; 0-7
-    tm.set(4);
+    tm.set(2);
     displayTimeSeg(cur_tmr_val);
 
     // rotary encoder
@@ -347,7 +347,7 @@ void start_isr() {
     }
 
 
-    // if we're in the middle of making an exposure...
+    // if we're in the middle of making an exposure...f
     if (EN_STATE == EN_ACTIVE || EN_STATE == EN_OVERRIDE_ON) {
         long unsigned timeleft = 0; // seconds
         long unsigned overtime = 0; // seconds
