@@ -52,7 +52,7 @@ volatile bool EN_STATE_CHANGE = 0;
 volatile en_states EN_ISR_REQ_STATE = EN_IDLE;
 
 volatile int STRT_state = 0; // for button interrupt reads
-const int STRT_DEBOUNCE_TIME = 200; // ms
+const int STRT_DEBOUNCE_INTERVAL = 100; // ms
 volatile long unsigned last_start_debounce = 0; // store when timer finishes in ms 
 //long unsigned start_pr_time = 0; // time elapsed since start pressed; reset at release
 
@@ -72,9 +72,14 @@ bool prev_ENS = false;
 
 int rot_buffer = 0;
 long unsigned last_rot = 0;
-int rot_delay = 100; // ms
+const int rot_delay = 100; // ms
 long unsigned first_push = 0;
-int push_cooldown = 300; // ms
+const int push_cooldown = 300; // ms
+const int lcd_backlight_timeout = 3 * 1000; //ms
+long unsigned last_lcd_interact = 0; 
+// consider replacing the above in v2 with variable brightness
+// see https://stackoverflow.com/questions/49086184/how-do-i-dim-the-backlight-on-an-20x4-lcd-display-with-the-i2c-connected-on-an-a
+
 
 
 enum f_states {
@@ -127,7 +132,7 @@ void enlargerOff() {
     digitalWrite(ENR, HIGH); // turn off enlarger
     //delay(500); // TODO: consider the wisdom of this decision
     digitalWrite(SLR, LOW); // turn on safelight
-    lcd.backlight();
+    //lcd.backlight();
     //EN_STATE = EN_IDLE;
     displayTimeSeg(cur_tmr_val);
 }
@@ -192,7 +197,7 @@ void start_isr() {
 
   //debounce - ok to use millis since time is frozen and we're not counting it to move
   unsigned long now = millis();
-  if (now - last_start_debounce < STRT_DEBOUNCE_TIME) {
+  if (now - last_start_debounce < STRT_DEBOUNCE_INTERVAL) {
     last_start_debounce = now;
     return;
   }
@@ -270,7 +275,7 @@ void start_isr() {
     // 4-7 segment display
     tm.init();
     //set brightness; 0-7
-    tm.set(2);
+    tm.set(1);
     displayTimeSeg(cur_tmr_val);
 
     // rotary encoder
@@ -405,6 +410,10 @@ void start_isr() {
     // otherwise, we're in cooldown or pb isn't being pressed, so ignore
     if (pb && (first_push + push_cooldown < now)) {
       first_push = now;
+      last_lcd_interact = now;
+      lcd.backlight();
+
+      
       f_states NEW_F_STATE = F_STATE;
       switch(F_STATE) {
       
@@ -464,6 +473,8 @@ void start_isr() {
       // some time has passed since the rotary did anything
       String dir = "Neutral";
       if (rb > 0) {
+        last_lcd_interact = now;
+        lcd.backlight();
         new_tmr_val = min(new_tmr_val + 1, MAX_TIME);
         updDispTimerEdit(new_tmr_val);
         #ifdef DEBUG
@@ -471,6 +482,8 @@ void start_isr() {
           Serial.println(dir + ":  rb = "+String(rb) +"   new tmr val = "+String(new_tmr_val));
         #endif
       } else if (rb < 0) {
+        last_lcd_interact = now;
+        lcd.backlight();
         new_tmr_val = max(new_tmr_val - 1, 1);
         updDispTimerEdit(new_tmr_val);
         #ifdef DEBUG
@@ -485,7 +498,15 @@ void start_isr() {
     } else if (F_SELECT && (now > lr + rot_delay)) {
       rot_buffer = 0;
     }
-    
+
+
+    //timeout the lcd backlight
+    if (now - lcd_backlight_timeout > last_lcd_interact) {
+        lcd.noBacklight();
+    }
+
+
+
 
   } // end loop
 
@@ -540,7 +561,7 @@ void start_isr() {
       GND     5v 
 
 
-RE wiring
+RE (rotary encoder) wiring
                     ____
       RE_A (7)   - |    |_  RE_BUT (6)
       GND        - |    |_  GND
