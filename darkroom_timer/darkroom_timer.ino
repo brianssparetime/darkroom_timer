@@ -58,7 +58,7 @@ volatile long unsigned last_start_debounce = 0; // store when timer finishes in 
 
 int cur_tmr_val = 5; // seconds; does not count down
 int new_tmr_val = 5; // seconds, for when setting a new value
-const int MAX_TIME = 60 * 60 -1; // 1 hour
+const long unsigned MAX_TIME = 60 * 60 * 1000-1; // 1 hour
 long unsigned timer_end = 0; // store when timer finishes in ms 
 
 //long unsigned last_disp_update = 0; // used for refreshing 47seg 
