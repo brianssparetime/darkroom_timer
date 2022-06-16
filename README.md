@@ -10,5 +10,12 @@ This project creates a usable darkroom timer that can:
 
 
 
+# Resources for v2 
+
+## better (hardware?) debounce for rotary encoders
+https://arduino.stackexchange.com/questions/61861/will-a-simple-rc-filter-work-with-my-mechanical-rotary-encoder-or-do-i-need-a-s
+https://forum.arduino.cc/t/rotary-encoder-debouncing/361438/11
+http://www.buxtronix.net/2011/10/rotary-encoders-done-properly.html
+
 
 
