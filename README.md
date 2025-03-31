@@ -1,6 +1,9 @@
 # Darkroom Timer project
 
 
+**Looking back, this code is shit that I'm ashamed I wrote.  Do not use it as a model for anything.  If you want a much better model, look at [PlantWaterBot](https://github.com/brianssparetime/PlantWaterBot), [DarkroomRoller](https://github.com/brianssparetime/darkroom_roller), or the barebones [example FSM for UI on Arduino](https://github.com/brianssparetime/UI_FSM_example)**
+
+
 This project creates a usable darkroom timer that can:
  - control turning on and off a safelight and enlarger
  - has a settable timer for keeping the enlarger on, with manual override or cancel
